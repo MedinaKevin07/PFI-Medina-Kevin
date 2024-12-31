@@ -1,0 +1,173 @@
+import sqlite3
+from colorama import Fore, init
+
+# Inicializa Colorama
+init(autoreset=True)
+
+def inicializar_base_datos():
+    """Conecta a la base de datos SQLite y asegura que la tabla exista."""
+    conexion = sqlite3.connect('gestion_inventario.db')
+    cursor = conexion.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            stock INTEGER NOT NULL,
+            precio REAL NOT NULL,
+            categoria TEXT
+        )
+    ''')
+    conexion.commit()
+    return conexion
+
+def agregar_item(conexion):
+    """Permite añadir un nuevo artículo al inventario."""
+    print(Fore.CYAN + "\n-- Agregar nuevo artículo --")
+    try:
+        nombre = input("Nombre del artículo: ").strip()
+        descripcion = input("Descripción: ").strip()
+        stock = int(input("Cantidad en stock: "))
+        precio = float(input("Precio unitario: "))
+        categoria = input("Categoría: ").strip()
+
+        cursor = conexion.cursor()
+        cursor.execute('''
+            INSERT INTO items (nombre, descripcion, stock, precio, categoria)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (nombre, descripcion, stock, precio, categoria))
+        conexion.commit()
+        print(Fore.GREEN + "Artículo agregado correctamente.")
+    except Exception as e:
+        print(Fore.RED + f"Error al agregar el artículo: {e}")
+
+def listar_items(conexion):
+    """Muestra todos los artículos registrados en el inventario."""
+    print(Fore.CYAN + "\n-- Listado de artículos --")
+    cursor = conexion.cursor()
+    cursor.execute("SELECT * FROM items")
+    resultados = cursor.fetchall()
+
+    if resultados:
+        for item in resultados:
+            print(f"ID: {item[0]}, Nombre: {item[1]}, Descripción: {item[2]}, "
+                  f"Stock: {item[3]}, Precio: ${item[4]:.2f}, Categoría: {item[5]}")
+    else:
+        print(Fore.YELLOW + "No hay artículos registrados.")
+
+def modificar_stock(conexion):
+    """Actualiza el stock de un artículo especificado por su ID."""
+    print(Fore.CYAN + "\n-- Modificar stock --")
+    try:
+        id_item = int(input("ID del artículo: "))
+        nuevo_stock = int(input("Nuevo stock: "))
+
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE items SET stock = ? WHERE id = ?", (nuevo_stock, id_item))
+        if cursor.rowcount > 0:
+            conexion.commit()
+            print(Fore.GREEN + "Stock actualizado correctamente.")
+        else:
+            print(Fore.RED + "Artículo no encontrado.")
+    except Exception as e:
+        print(Fore.RED + f"Error al actualizar el stock: {e}")
+
+def eliminar_item(conexion):
+    """Elimina un artículo del inventario según su ID."""
+    print(Fore.CYAN + "\n-- Eliminar artículo --")
+    try:
+        id_item = int(input("ID del artículo a eliminar: "))
+
+        cursor = conexion.cursor()
+        cursor.execute("DELETE FROM items WHERE id = ?", (id_item,))
+        if cursor.rowcount > 0:
+            conexion.commit()
+            print(Fore.GREEN + "Artículo eliminado correctamente.")
+        else:
+            print(Fore.RED + "No se encontró el artículo especificado.")
+    except Exception as e:
+        print(Fore.RED + f"Error al eliminar el artículo: {e}")
+
+def buscar_item(conexion):
+    """Busca artículos por ID, nombre o categoría."""
+    print(Fore.CYAN + "\n-- Buscar artículo --")
+    criterio = input("Buscar por (id/nombre/categoria): ").strip().lower()
+    valor = input("Valor a buscar: ").strip()
+
+    cursor = conexion.cursor()
+    try:
+        if criterio == "id":
+            cursor.execute("SELECT * FROM items WHERE id = ?", (valor,))
+        elif criterio == "nombre":
+            cursor.execute("SELECT * FROM items WHERE nombre LIKE ?", (f"%{valor}%",))
+        elif criterio == "categoria":
+            cursor.execute("SELECT * FROM items WHERE categoria LIKE ?", (f"%{valor}%",))
+        else:
+            print(Fore.RED + "Criterio de búsqueda no válido.")
+            return
+
+        resultados = cursor.fetchall()
+        if resultados:
+            for item in resultados:
+                print(f"ID: {item[0]}, Nombre: {item[1]}, Descripción: {item[2]}, "
+                      f"Stock: {item[3]}, Precio: ${item[4]:.2f}, Categoría: {item[5]}")
+        else:
+            print(Fore.YELLOW + "No se encontraron coincidencias.")
+    except Exception as e:
+        print(Fore.RED + f"Error en la búsqueda: {e}")
+
+def generar_reporte_bajo_stock(conexion):
+    """Genera un reporte de artículos cuyo stock está por debajo de un límite."""
+    print(Fore.CYAN + "\n-- Reporte de bajo stock --")
+    try:
+        limite = int(input("Límite de stock: "))
+
+        cursor = conexion.cursor()
+        cursor.execute("SELECT * FROM items WHERE stock <= ?", (limite,))
+        resultados = cursor.fetchall()
+
+        if resultados:
+            print(Fore.BLUE + f"\nArtículos con stock igual o inferior a {limite}:")
+            for item in resultados:
+                print(f"ID: {item[0]}, Nombre: {item[1]}, Stock: {item[3]}")
+        else:
+            print(Fore.YELLOW + "No hay artículos con bajo stock.")
+    except Exception as e:
+        print(Fore.RED + f"Error al generar el reporte: {e}")
+
+def menu_principal():
+    """Despliega el menú principal del sistema de gestión de inventario."""
+    conexion = inicializar_base_datos()
+
+    while True:
+        print(Fore.CYAN + "\n-- Menú Principal --")
+        print("1. Agregar artículo")
+        print("2. Listar artículos")
+        print("3. Modificar stock")
+        print("4. Eliminar artículo")
+        print("5. Buscar artículo")
+        print("6. Generar reporte de bajo stock")
+        print("7. Salir")
+
+        opcion = input("Seleccione una opción: ").strip()
+        if opcion == "1":
+            agregar_item(conexion)
+        elif opcion == "2":
+            listar_items(conexion)
+        elif opcion == "3":
+            modificar_stock(conexion)
+        elif opcion == "4":
+            eliminar_item(conexion)
+        elif opcion == "5":
+            buscar_item(conexion)
+        elif opcion == "6":
+            generar_reporte_bajo_stock(conexion)
+        elif opcion == "7":
+            print(Fore.GREEN + "Gracias por usar el sistema de gestión de inventario.")
+            conexion.close()
+            break
+        else:
+            print(Fore.RED + "Opción no válida. Intente nuevamente.")
+
+if __name__ == "__main__":
+    menu_principal()
